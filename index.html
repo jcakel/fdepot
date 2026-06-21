@@ -61,27 +61,33 @@
     </div>
 </div>
 
-<!-- MODAL - SOLO PRECIOS GRANDES EN VERDE -->
+<!-- MODAL LIMPIO -->
 <div id="modal" class="hidden fixed inset-0 bg-black/70 z-[999] flex items-center justify-center" onclick="if(event.target.id==='modal')closeModal()">
     <div onclick="event.stopImmediatePropagation()" class="modal bg-white max-w-2xl w-full mx-4 rounded-3xl overflow-hidden shadow-2xl">
         <div class="flex">
             <div class="w-5/12 bg-zinc-100">
                 <img id="modalImage" class="w-full h-full object-cover" alt="">
             </div>
-            <div class="flex-1 p-6 md:p-8">
+            <div class="flex-1 p-8">
                 <button onclick="closeModal()" class="float-right text-3xl text-zinc-400 hover:text-zinc-600">×</button>
                 
                 <div id="modalCategory" class="inline-block px-4 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700 mb-3"></div>
                 <h2 id="modalName" class="text-2xl font-semibold"></h2>
                 <p id="modalSku" class="font-mono text-sm text-zinc-500 mt-1"></p>
 
-                <!-- SOLO LOS PRECIOS GRANDES EN VERDE -->
+                <!-- SOLO PRECIOS GRANDES EN VERDE -->
                 <div class="my-8 space-y-6">
-                    <div id="modalPriceM2" class="text-5xl font-semibold text-emerald-600"></div>
-                    <div id="modalPriceCaja" class="text-4xl font-semibold text-emerald-700"></div>
+                    <div>
+                        <span class="text-xs font-medium text-zinc-400 uppercase tracking-wide">Precio m²</span>
+                        <div id="modalPriceM2" class="text-5xl font-semibold text-emerald-600"></div>
+                    </div>
+                    <div>
+                        <span class="text-xs font-medium text-zinc-400 uppercase tracking-wide">Precio por caja</span>
+                        <div id="modalPriceCaja" class="text-4xl font-semibold text-emerald-700"></div>
+                    </div>
                 </div>
 
-                <div id="modalCharacteristics" class="grid grid-cols-2 gap-x-6 gap-y-5 text-sm max-h-[340px] overflow-y-auto"></div>
+                <div id="modalCharacteristics" class="grid grid-cols-2 gap-x-6 gap-y-5 text-sm max-h-[360px] overflow-y-auto"></div>
 
                 <button onclick="openWhatsApp()" class="mt-10 w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-medium py-4 rounded-2xl flex items-center justify-center gap-3">
                     <i class="fa-brands fa-whatsapp text-3xl"></i>
@@ -206,16 +212,17 @@
         document.getElementById("modalName").textContent = p["Nombre"] || "";
         document.getElementById("modalSku").textContent = p["SKU"] || "";
         
-        // Solo los valores grandes en verde
         document.getElementById("modalPriceM2").textContent = "$" + priceM2.toLocaleString("es-CL");
         document.getElementById("modalPriceCaja").textContent = "$" + priceCaja.toLocaleString("es-CL");
 
         const container = document.getElementById("modalCharacteristics");
         container.innerHTML = "";
 
+        const EXCLUDED_KEYS = ["Imagen_URL", "Producto_URL", "Fecha_scrape", "Precio_m2", "Precio_caja", "Precio_por_caja", "Precio"];
+
         Object.keys(p).forEach(key => {
             if (!p[key] || p[key] === "") return;
-            if (["Imagen_URL", "Producto_URL", "Fecha_scrape"].includes(key)) return;
+            if (EXCLUDED_KEYS.includes(key)) return;
 
             let label = key.replace(/_/g, " ");
             const div = document.createElement("div");
