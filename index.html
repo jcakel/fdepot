@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
     <meta property="og:title" content="Catálogo Floor Depot">
-    <meta property="og:description" content="Explora nuestro catálogo de productos y soluciones de Floor Depot.">
-    <meta property="og:image" content="https://jcakel.github.io/fdepot/catalogo-floor-depot.jpg">
-    <meta property="og:url" content="https://jcakel.github.io/fdepot/">
-    <meta property="og:type" content="website">
+<meta property="og:description" content="Explora nuestro catálogo de productos y soluciones de Floor Depot.">
+<meta property="og:image" content="https://jcakel.github.io/fdepot/catalogo-floor-depot.jpg">
+<meta property="og:url" content="https://jcakel.github.io/fdepot/">
+<meta property="og:type" content="website">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catálogo • Floor Depot</title>
@@ -18,6 +18,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@700&display=swap');
         body { font-family: 'Inter', system_ui, sans-serif; }
         .title-font { font-family: 'Playfair Display', sans-serif; }
+        
         .product-card { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
         .product-card:hover { transform: translateY(-6px); box-shadow: 0 15px 20px -5px rgb(0 0 0 / 0.1); }
     </style>
@@ -65,6 +66,7 @@
     </div>
 </div>
 
+<!-- MODAL LIMPIO -->
 <div id="modal" class="hidden fixed inset-0 bg-black/70 z-[999] flex items-center justify-center" onclick="if(event.target.id==='modal')closeModal()">
     <div onclick="event.stopImmediatePropagation()" class="modal bg-white max-w-2xl w-full mx-4 rounded-3xl overflow-hidden shadow-2xl">
         <div class="flex">
@@ -73,10 +75,12 @@
             </div>
             <div class="flex-1 p-8">
                 <button onclick="closeModal()" class="float-right text-3xl text-zinc-400 hover:text-zinc-600">×</button>
+                
                 <div id="modalCategory" class="inline-block px-4 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700 mb-3"></div>
                 <h2 id="modalName" class="text-2xl font-semibold"></h2>
                 <p id="modalSku" class="font-mono text-sm text-zinc-500 mt-1"></p>
 
+                <!-- SOLO PRECIOS GRANDES EN VERDE -->
                 <div class="my-8 space-y-6">
                     <div>
                         <span class="text-xs font-medium text-zinc-400 uppercase tracking-wide">Precio m²</span>
@@ -102,6 +106,7 @@
 <script>
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/1MVDocwSxrGDjCPP0UT-aQmMZx7iT_MG5WD_nJ3y4cPo/export?format=csv&gid=0";
     const WHATSAPP_NUMBER = "56878786666";
+
     let allProducts = [];
 
     tailwind.config = { content: [], theme: { extend: {} } };
@@ -110,15 +115,6 @@
         const calc = parseFloat(precio || 0) * 1.235;
         const base = Math.floor(calc / 100) * 100;
         return Math.abs(calc - (base + 90)) <= Math.abs(calc - (base + 190)) ? base + 90 : base + 190;
-    }
-
-    // Nueva función para leer el parámetro ?q= de la URL
-    function checkUrlParams() {
-        const params = new URLSearchParams(window.location.search);
-        const query = params.get('q');
-        if (query) {
-            document.getElementById("searchInput").value = query;
-        }
     }
 
     async function loadData() {
@@ -135,9 +131,7 @@
                 });
 
                 allProducts.sort((a, b) => roundTo90(a["Precio_m2"]) - roundTo90(b["Precio_m2"]));
-                
-                checkUrlParams(); // Leer URL al iniciar
-                applyFilters();   // Aplicar filtro inmediatamente
+                applyFilters();
             }
         });
     }
@@ -146,10 +140,12 @@
         const container = document.getElementById("productGrid");
         container.innerHTML = "";
         document.getElementById("resultCount").textContent = products.length;
+
         if (!products.length) {
             container.innerHTML = `<div class="col-span-full text-center py-12 text-zinc-400">No se encontraron productos</div>`;
             return;
         }
+
         const fragment = document.createDocumentFragment();
         products.forEach(p => {
             const price = roundTo90(p["Precio_m2"]);
@@ -183,11 +179,13 @@
     function applyFilters() {
         const term = document.getElementById("searchInput").value.toLowerCase().trim();
         const words = term.split(/\s+/).filter(Boolean);
+
         const filtered = allProducts.filter(product => {
             if (!words.length) return true;
             const text = Object.values(product).join(" ").toLowerCase();
             return words.every(word => text.includes(word));
         });
+
         renderGrid(filtered);
     }
 
@@ -195,12 +193,16 @@
         const searchTerm = document.getElementById("searchInput").value.trim();
         const url = new URL(window.location.href.split("?")[0]);
         if (searchTerm) url.searchParams.set('q', searchTerm);
+
         const finalUrl = url.toString();
+
         navigator.clipboard.writeText(finalUrl).then(() => {
             const icon = document.getElementById("copyIcon");
             const original = icon.className;
             icon.className = "fa-solid fa-check text-green-500";
             setTimeout(() => { icon.className = original; }, 2200);
+        }).catch(() => {
+            alert("Enlace generado:\n\n" + finalUrl);
         });
     }
 
@@ -208,24 +210,32 @@
         const priceM2 = roundTo90(p["Precio_m2"]);
         const rendimiento = parseFloat(p["Rendimiento"] || p["Cajas_por_m2"] || p["Rendimiento_m2"] || 1);
         const priceCaja = Math.round(priceM2 * rendimiento);
+
         document.getElementById("modalImage").src = p["Imagen_URL"] || "https://picsum.photos/600/600?text=Sin+foto";
+
         document.getElementById("modalCategory").textContent = p["Categoria"] || "";
         document.getElementById("modalName").textContent = p["Nombre"] || "";
         document.getElementById("modalSku").textContent = p["SKU"] || "";
+        
         document.getElementById("modalPriceM2").textContent = "$" + priceM2.toLocaleString("es-CL");
         document.getElementById("modalPriceCaja").textContent = "$" + priceCaja.toLocaleString("es-CL");
+
         const container = document.getElementById("modalCharacteristics");
         container.innerHTML = "";
+
         const EXCLUDED_KEYS = ["Imagen_URL", "Producto_URL", "Fecha_scrape", "Precio_m2", "Precio_caja", "Precio_por_caja", "Precio"];
+
         Object.keys(p).forEach(key => {
             if (!p[key] || p[key] === "") return;
             if (EXCLUDED_KEYS.includes(key)) return;
+
             let label = key.replace(/_/g, " ");
             const div = document.createElement("div");
             div.className = "flex justify-between border-b pb-3";
             div.innerHTML = `<span class="font-medium text-zinc-500">${label}</span><span class="font-semibold">${p[key]}</span>`;
             container.appendChild(div);
         });
+
         document.getElementById("modal").classList.remove("hidden");
         document.getElementById("modal").classList.add("flex");
     }
