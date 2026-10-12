@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta property="og:title" content="Catálogo Terra Hogar">
+    <meta property="og:description" content="Explora el catálogo de productos de Terra Hogar.">
+    <meta property="og:image" content="https://jcakel.github.io/fdepot/catalogo-floor-depot.jpg">
+    <meta property="og:url" content="https://fdepot.vercel.app/terra-hogar.html">
+    <meta property="og:type" content="website">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo • Terra Hogar</title>
+    
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@700&display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .quick-query { border:1px solid #bfdbfe; background:white; color:#1d4ed8; padding:.35rem .7rem; border-radius:999px; font-size:.75rem; }
+        .quick-query:hover { background:#dbeafe; }
+        .title-font { font-family: 'Playfair Display', sans-serif; }
+        
+        .product-card { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+        .product-card:hover { transform: translateY(-6px); box-shadow: 0 15px 20px -5px rgb(0 0 0 / 0.1); }
+    </style>
+</head>
+<body class="bg-zinc-50">
+
+<div class="max-w-7xl mx-auto">
+    <header class="bg-white border-b sticky top-0 z-50 shadow-sm">
+        <div class="px-4 md:px-8 py-5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-layer-group text-2xl text-blue-700"></i>
+                <div>
+                    <h1 class="title-font text-2xl font-bold text-zinc-900">Terra Hogar</h1>
+                </div>
+            </div>
+            
+            <div class="flex-1 max-w-xl mx-4">
+                <div class="relative">
+                    <input id="searchInput" 
+                           onkeyup="applyFilters()" 
+                           type="text" 
+                           placeholder="Ej.: piso oscuro para baño o terraza exterior..." 
+                           class="w-full bg-zinc-100 border border-transparent focus:border-blue-500 focus:bg-white rounded-3xl px-5 py-3.5 text-base outline-none">
+                    <i class="fa-solid fa-magnifying-glass absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400"></i>
+                </div>
+            </div>
+
+            <button onclick="copyShareLink()" 
+                    id="copyBtn"
+                    class="flex items-center justify-center w-11 h-11 bg-white border border-zinc-300 hover:border-blue-500 rounded-2xl transition-colors">
+                <i id="copyIcon" class="fa-solid fa-link text-2xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="p-4 md:p-8">
+        <div class="flex justify-between items-baseline mb-6">
+            <div>
+                <span id="resultCount" class="text-2xl font-semibold text-zinc-900">0</span>
+                <span class="text-zinc-400 text-sm ml-2">productos</span>
+            </div>
+        </div>
+
+        <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6"></div>
+    </div>
+</div>
+
+<!-- MODAL: datos arriba, foto abajo -->
+<div id="modal" class="hidden fixed inset-0 bg-black/70 z-[999] flex items-center justify-center" onclick="if(event.target.id==='modal')closeModal()">
+    <div onclick="event.stopImmediatePropagation()" class="modal bg-white max-w-lg w-full mx-4 rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
+        <!-- Sección de datos arriba -->
+        <div class="p-8">
+            <button onclick="closeModal()" class="float-right text-3xl text-zinc-400 hover:text-zinc-600 leading-none">×</button>
+            
+            <div id="modalCategory" class="inline-block px-4 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700 mb-3"></div>
+            <h2 id="modalName" class="text-2xl font-semibold"></h2>
+            <p id="modalSku" class="font-mono text-sm text-zinc-500 mt-1"></p>
+
+            <div class="my-8 space-y-6">
+                <div>
+                    <span class="text-xs font-medium text-zinc-400 uppercase tracking-wide">Precio m²</span>
+                    <div id="modalPriceM2" class="text-5xl font-semibold text-emerald-600"></div>
+                </div>
+                <div>
+                    <span class="text-xs font-medium text-zinc-400 uppercase tracking-wide">Precio por caja</span>
+                    <div id="modalPriceCaja" class="text-4xl font-semibold text-emerald-700"></div>
+                </div>
+            </div>
+
+            <div id="modalCharacteristics" class="grid grid-cols-2 gap-x-6 gap-y-5 text-sm"></div>
+
+            <button onclick="openWhatsApp()" class="mt-10 w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-medium py-4 rounded-2xl flex items-center justify-center gap-3">
+                <i class="fa-brands fa-whatsapp text-3xl"></i>
+                <span>Contactar por WhatsApp</span>
+            </button>
+        </div>
+
+        <!-- Foto abajo -->
+        <div class="bg-zinc-100 w-full aspect-square">
+            <img id="modalImage" class="w-full h-full object-cover" alt="">
+        </div>
+    </div>
+</div>
+
+<script>
+    const SHEET_URL = "https://docs.google.com/spreadsheets/d/1XIy2LOOZhzjOKM6F7JDmnIp-q3D10UsNe0lhvSu30-Y/gviz/tq?tqx=out:csv&sheet=Productos";
+    const WHATSAPP_NUMBER = "56878786666";
+
+    let allProducts = [];
+
+    tailwind.config = { content: [], theme: { extend: {} } };
+
+    function roundTo90(precio) {
+        const calc = parseFloat(precio || 0) * 1.357143;
+        const base = Math.floor(calc / 100) * 100;
+        return Math.abs(calc - (base + 90)) <= Math.abs(calc - (base + 190)) ? base + 90 : base + 190;
+    }
+
+    async function loadData() {
+        try {
+            const res = await fetch(SHEET_URL);
+            const text = await res.text();
+            
+            Papa.parse(text, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    allProducts = results.data.filter(row => {
+                        const nombre = (row["Nombre"] || "").toString().trim();
+                        return nombre.length > 3;
+                    });
+
+                    allProducts.sort((a, b) => roundTo90(a["Precio_m2"]) - roundTo90(b["Precio_m2"]));
+                    
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const query = urlParams.get('q');
+                    if (query) {
+                        document.getElementById("searchInput").value = query;
+                    }
+
+                    applyFilters();
+                }
+            });
+        } catch (error) {
+            console.error("Error al cargar los datos desde Google Sheets:", error);
+        }
+    }
+
+    function renderGrid(products) {
+        const container = document.getElementById("productGrid");
+        container.innerHTML = "";
+        document.getElementById("resultCount").textContent = products.length;
+
+        if (!products.length) {
+            container.innerHTML = `<div class="col-span-full text-center py-12 text-zinc-400">No se encontraron productos</div>`;
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        products.forEach(p => {
+            const price = roundTo90(p["Precio_m2"]);
+            const card = document.createElement("div");
+            card.className = "product-card bg-white border border-zinc-100 rounded-3xl overflow-hidden cursor-pointer group";
+            card.innerHTML = `
+                <div class="relative aspect-square bg-zinc-100 overflow-hidden">
+                    <img src="${p["Imagen_URL"] || 'https://picsum.photos/400/400?text=Sin+foto'}" class="w-full h-full object-cover transition-transform group-hover:scale-105">
+                </div>
+                <div class="p-4">
+                    <h3 class="font-semibold text-base leading-tight line-clamp-2 group-hover:text-blue-700">${p["Nombre"]}</h3>
+                    <p class="text-xs font-mono text-zinc-400 mt-1.5">${p["SKU"] || ""}</p>
+                    <div class="mt-5 flex justify-between items-end">
+                        <div>
+                            <span class="text-xs text-zinc-400">Precio</span>
+                            <div class="text-2xl font-semibold text-emerald-600">$${price.toLocaleString("es-CL")} <span class="text-base font-medium text-emerald-500">m²</span></div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs text-zinc-400">Stock</span>
+                            <div class="text-lg font-medium">${p["Stock_Total_m2"] || p["Stock"] || "—"}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            card.onclick = () => showModal(p);
+            fragment.appendChild(card);
+        });
+        container.appendChild(fragment);
+    }
+
+    function normalizeText(value) { return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
+    const synonyms = { exterior:["terraza","patio","jardin","intemperie"], oscuro:["oscuros","oscura","oscuras","negro","negra","grafito","antracita"], bano:["baño","ducha","humedo","humeda","humedad","wc"], antideslizante:["antideslizantes","rugoso","rugosa"], mate:["opaco","sin brillo"], piso:["suelo","pavimento","ceramica","porcelanato"] };
+    function queryGroups(query) {
+        const normalized=normalizeText(query);
+        const ignored=new Set(["para","por","con","de","del","la","el","los","las","un","una","que","busco","quiero","piso","colores","color"]);
+        const terms=normalized.split(/\s+/).filter(w=>w.length>1&&!ignored.has(w));
+        return terms.map(term=>{
+            for(const [key,vals] of Object.entries(synonyms)){
+                const group=[normalizeText(key),...vals.map(normalizeText)];
+                if(group.some(v=>v===term||v.includes(term)||term.includes(v))) return group;
+            }
+            return [term];
+        });
+    }
+    function applyFilters() {
+        const query=document.getElementById("searchInput").value.trim(), groups=queryGroups(query);
+        const filtered=allProducts.filter(product=>{
+            if(!groups.length)return true;
+            const text=normalizeText(Object.entries(product).filter(([k])=>!["Imagen_URL","Producto_URL"].includes(k)).map(([k,v])=>k.replace(/_/g," ")+" "+String(v??"")).join(" "));
+            return groups.every(group=>group.some(word=>text.includes(word)));
+        });
+        renderGrid(filtered);
+    }
+
+    function copyShareLink() {
+        const searchTerm = document.getElementById("searchInput").value.trim();
+        const url = new URL(window.location.href.split("?")[0]);
+        if (searchTerm) url.searchParams.set('q', searchTerm);
+
+        const finalUrl = url.toString();
+
+        navigator.clipboard.writeText(finalUrl).then(() => {
+            const icon = document.getElementById("copyIcon");
+            const original = icon.className;
+            icon.className = "fa-solid fa-check text-green-500";
+            setTimeout(() => { icon.className = original; }, 2200);
+        }).catch(() => {
+            alert("Enlace generado:\n\n" + finalUrl);
+        });
+    }
+
+    function showModal(p) {
+        const priceM2 = roundTo90(p["Precio_m2"]);
+        const rendimiento = parseFloat(p["Rendimiento"] || p["Cajas_por_m2"] || p["Rendimiento_m2"] || 1);
+        const priceCaja = Math.round(priceM2 * rendimiento);
+
+        document.getElementById("modalImage").src = p["Imagen_URL"] || "https://picsum.photos/600/600?text=Sin+foto";
+
+        document.getElementById("modalCategory").textContent = p["Categoria"] || "";
+        document.getElementById("modalName").textContent = p["Nombre"] || "";
+        document.getElementById("modalSku").textContent = p["SKU"] || "";
+        
+        document.getElementById("modalPriceM2").textContent = "$" + priceM2.toLocaleString("es-CL");
+        document.getElementById("modalPriceCaja").textContent = "$" + priceCaja.toLocaleString("es-CL");
+
+        const container = document.getElementById("modalCharacteristics");
+        container.innerHTML = "";
+
+        const EXCLUDED_KEYS = ["Imagen_URL", "Producto_URL", "Fecha_scrape", "Precio_m2", "Precio_caja", "Precio_por_caja", "Precio"];
+
+        Object.keys(p).forEach(key => {
+            if (!p[key] || p[key] === "") return;
+            if (EXCLUDED_KEYS.includes(key)) return;
+
+            let label = key.replace(/_/g, " ");
+            const div = document.createElement("div");
+            div.className = "flex justify-between border-b pb-3";
+            div.innerHTML = `<span class="font-medium text-zinc-500">${label}</span><span class="font-semibold">${p[key]}</span>`;
+            container.appendChild(div);
+        });
+
+        document.getElementById("modal").classList.remove("hidden");
+        document.getElementById("modal").classList.add("flex");
+    }
+
+    function openWhatsApp() {
+        const name = document.getElementById("modalName").textContent;
+        const text = encodeURIComponent(`Hola, estoy interesado en: ${name}`);
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${text}`, "_blank");
+    }
+
+    function closeModal() {
+        const m = document.getElementById("modal");
+        m.classList.add("hidden");
+        m.classList.remove("flex");
+    }
+
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();applyFilters();} });
+    document.querySelectorAll('[data-query]').forEach(btn => btn.addEventListener('click', () => { document.getElementById('searchInput').value=btn.dataset.query; applyFilters(); }));
+    window.onload = loadData;
+</script>
+</body>
+</html>
