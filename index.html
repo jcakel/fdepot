@@ -16,7 +16,9 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@700&display=swap');
-        body { font-family: 'Inter', system_ui, sans-serif; }
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .quick-query { border:1px solid #bfdbfe; background:white; color:#1d4ed8; padding:.35rem .7rem; border-radius:999px; font-size:.75rem; }
+        .quick-query:hover { background:#dbeafe; }
         .title-font { font-family: 'Playfair Display', sans-serif; }
         
         .product-card { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
@@ -40,7 +42,7 @@
                     <input id="searchInput" 
                            onkeyup="applyFilters()" 
                            type="text" 
-                           placeholder="Busca por nombre, SKU o varias palabras..." 
+                           placeholder="Ej.: piso oscuro para baño o terraza exterior..." 
                            class="w-full bg-zinc-100 border border-transparent focus:border-blue-500 focus:bg-white rounded-3xl px-5 py-3.5 text-base outline-none">
                     <i class="fa-solid fa-magnifying-glass absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400"></i>
                 </div>
@@ -112,7 +114,7 @@
     tailwind.config = { content: [], theme: { extend: {} } };
 
     function roundTo90(precio) {
-        const calc = parseFloat(precio || 0) * 1.235;
+        const calc = parseFloat(precio || 0) * 1.357143;
         const base = Math.floor(calc / 100) * 100;
         return Math.abs(calc - (base + 90)) <= Math.abs(calc - (base + 190)) ? base + 90 : base + 190;
     }
@@ -187,16 +189,16 @@
         container.appendChild(fragment);
     }
 
+    function normalizeText(value) { return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
+    const synonyms = { exterior:["terraza","patio","jardin","intemperie"], oscuro:["oscuros","oscura","oscuras","negro","negra","grafito","antracita"], bano:["baño","ducha","humedo","humeda","humedad","wc"], antideslizante:["antideslizantes","rugoso","rugosa"], mate:["opaco","sin brillo"], piso:["suelo","pavimento","ceramica","porcelanato"] };
+    function expandWords(query) {
+        const normalized=normalizeText(query), words=normalized.split(/\s+/).filter(Boolean), out=new Set(words);
+        Object.entries(synonyms).forEach(([key,vals])=>{const group=[normalizeText(key),...vals.map(normalizeText)];if(group.some(v=>normalized.includes(v)))group.forEach(v=>out.add(v));});
+        return [...out];
+    }
     function applyFilters() {
-        const term = document.getElementById("searchInput").value.toLowerCase().trim();
-        const words = term.split(/\s+/).filter(Boolean);
-
-        const filtered = allProducts.filter(product => {
-            if (!words.length) return true;
-            const text = Object.values(product).join(" ").toLowerCase();
-            return words.every(word => text.includes(word));
-        });
-
+        const query=document.getElementById("searchInput").value.trim(), words=expandWords(query);
+        const filtered=allProducts.filter(product=>{if(!words.length)return true;const text=normalizeText(Object.entries(product).filter(([k])=>!["Imagen_URL","Producto_URL"].includes(k)).map(([k,v])=>k.replace(/_/g," ")+" "+String(v??"")).join(" "));return words.every(word=>text.includes(word));});
         renderGrid(filtered);
     }
 
@@ -263,6 +265,9 @@
         m.classList.remove("flex");
     }
 
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();applyFilters();} });
+    document.querySelectorAll('[data-query]').forEach(btn => btn.addEventListener('click', () => { document.getElementById('searchInput').value=btn.dataset.query; applyFilters(); }));
     window.onload = loadData;
 </script>
 </body>
