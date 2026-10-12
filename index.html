@@ -191,14 +191,25 @@
 
     function normalizeText(value) { return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
     const synonyms = { exterior:["terraza","patio","jardin","intemperie"], oscuro:["oscuros","oscura","oscuras","negro","negra","grafito","antracita"], bano:["baño","ducha","humedo","humeda","humedad","wc"], antideslizante:["antideslizantes","rugoso","rugosa"], mate:["opaco","sin brillo"], piso:["suelo","pavimento","ceramica","porcelanato"] };
-    function expandWords(query) {
-        const normalized=normalizeText(query), words=normalized.split(/\s+/).filter(Boolean), out=new Set(words);
-        Object.entries(synonyms).forEach(([key,vals])=>{const group=[normalizeText(key),...vals.map(normalizeText)];if(group.some(v=>normalized.includes(v)))group.forEach(v=>out.add(v));});
-        return [...out];
+    function queryGroups(query) {
+        const normalized=normalizeText(query);
+        const ignored=new Set(["para","por","con","de","del","la","el","los","las","un","una","que","busco","quiero","piso","colores","color"]);
+        const terms=normalized.split(/\s+/).filter(w=>w.length>1&&!ignored.has(w));
+        return terms.map(term=>{
+            for(const [key,vals] of Object.entries(synonyms)){
+                const group=[normalizeText(key),...vals.map(normalizeText)];
+                if(group.some(v=>v===term||v.includes(term)||term.includes(v))) return group;
+            }
+            return [term];
+        });
     }
     function applyFilters() {
-        const query=document.getElementById("searchInput").value.trim(), words=expandWords(query);
-        const filtered=allProducts.filter(product=>{if(!words.length)return true;const text=normalizeText(Object.entries(product).filter(([k])=>!["Imagen_URL","Producto_URL"].includes(k)).map(([k,v])=>k.replace(/_/g," ")+" "+String(v??"")).join(" "));return words.every(word=>text.includes(word));});
+        const query=document.getElementById("searchInput").value.trim(), groups=queryGroups(query);
+        const filtered=allProducts.filter(product=>{
+            if(!groups.length)return true;
+            const text=normalizeText(Object.entries(product).filter(([k])=>!["Imagen_URL","Producto_URL"].includes(k)).map(([k,v])=>k.replace(/_/g," ")+" "+String(v??"")).join(" "));
+            return groups.every(group=>group.some(word=>text.includes(word)));
+        });
         renderGrid(filtered);
     }
 
