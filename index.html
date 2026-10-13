@@ -189,26 +189,71 @@
         container.appendChild(fragment);
     }
 
-    function normalizeText(value) { return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
-    const synonyms = { exterior:["terraza","patio","jardin","intemperie"], oscuro:["oscuros","oscura","oscuras","negro","negra","grafito","antracita"], bano:["baño","ducha","humedo","humeda","humedad","wc"], antideslizante:["antideslizantes","rugoso","rugosa"], mate:["opaco","sin brillo"], piso:["suelo","pavimento","ceramica","porcelanato"] };
-    function queryGroups(query) {
-        const normalized=normalizeText(query);
-        const ignored=new Set(["para","por","con","de","del","la","el","los","las","un","una","que","busco","quiero","piso","colores","color"]);
-        const terms=normalized.split(/\s+/).filter(w=>w.length>1&&!ignored.has(w));
-        return terms.map(term=>{
-            for(const [key,vals] of Object.entries(synonyms)){
-                const group=[normalizeText(key),...vals.map(normalizeText)];
-                if(group.some(v=>v===term||v.includes(term)||term.includes(v))) return group;
-            }
-            return [term];
-        });
+    function normalizeText(value) {
+        return String(value ?? "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\\u0300-\\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim()
+            .replace(/\\s+/g, " ");
     }
+
+    // Búsqueda por palabras: cada término debe aparecer en los datos o en un sinónimo.
+    // Los plurales comunes se normalizan para que "porcelanatos" encuentre "porcelanato".
+    function normalizeWord(word) {
+        let w = normalizeText(word);
+        if (w.length > 5 && w.endsWith("es")) w = w.slice(0, -2);
+        else if (w.length > 4 && w.endsWith("s")) w = w.slice(0, -1);
+        return w;
+    }
+
+    const synonymGroups = [
+        ["porcelanato", "porcelanatos", "porcelanato esmaltado"],
+        ["ceramica", "ceramicas", "ceramico", "ceramica"],
+        ["exterior", "terraza", "terrazas", "patio", "jardin", "intemperie"],
+        ["oscuro", "oscura", "oscuros", "oscuras", "negro", "negra", "negros", "negras", "grafito", "antracita"],
+        ["bano", "banos", "ducha", "duchas", "wc", "humedo", "humeda", "humedos", "humedas"],
+        ["antideslizante", "antideslizantes", "rugoso", "rugosa", "rugosos", "rugosas"],
+        ["mate", "opaco", "opaca", "sin brillo"],
+        ["piso", "pisos", "suelo", "suelos", "pavimento", "pavimentos"],
+        ["muro", "muros", "pared", "paredes", "revestimiento"],
+        ["brillante", "brillantes", "pulido", "pulida", "pulidos", "pulidas"]
+    ];
+
+    const ignoredWords = new Set([
+        "para", "por", "con", "de", "del", "la", "el", "los", "las", "un", "una",
+        "unos", "unas", "que", "busco", "quiero", "necesito", "me", "recomienda",
+        "recomendar", "color", "colores", "tipo", "ideal", "favor", "y", "en"
+    ]);
+
+    function expandTerm(term) {
+        const word = normalizeWord(term);
+        for (const group of synonymGroups) {
+            const normalizedGroup = group.map(normalizeWord);
+            if (normalizedGroup.some(item => item === word || item.startsWith(word) || word.startsWith(item))) {
+                return normalizedGroup;
+            }
+        }
+        return [word];
+    }
+
     function applyFilters() {
-        const query=document.getElementById("searchInput").value.trim(), groups=queryGroups(query);
-        const filtered=allProducts.filter(product=>{
-            if(!groups.length)return true;
-            const text=normalizeText(Object.entries(product).filter(([k])=>!["Imagen_URL","Producto_URL"].includes(k)).map(([k,v])=>k.replace(/_/g," ")+" "+String(v??"")).join(" "));
-            return groups.every(group=>group.some(word=>text.includes(word)));
+        const query = document.getElementById("searchInput").value.trim();
+        const terms = normalizeText(query).split(" ")
+            .map(normalizeWord)
+            .filter(word => word.length > 1 && !ignoredWords.has(word));
+        const groups = terms.map(expandTerm);
+        const filtered = allProducts.filter(product => {
+            if (!groups.length) return true;
+            const searchableText = normalizeText(
+                Object.entries(product)
+                    .filter(([key]) => !["Imagen_URL", "Producto_URL"].includes(key))
+                    .map(([key, value]) => key.replace(/_/g, " ") + " " + String(value ?? ""))
+                    .join(" ")
+            );
+            // Para cada palabra consultada basta con que coincida el término o un sinónimo.
+            return groups.every(group => group.some(term => searchableText.includes(term)));
         });
         renderGrid(filtered);
     }
