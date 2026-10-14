@@ -134,6 +134,7 @@
                     });
 
                     allProducts.sort((a, b) => roundTo90(a["Precio_m2"]) - roundTo90(b["Precio_m2"]));
+                    indexProducts();
                     
                     const urlParams = new URLSearchParams(window.location.search);
                     const query = urlParams.get('q');
@@ -193,14 +194,12 @@
         return String(value ?? "")
             .toLowerCase()
             .normalize("NFD")
-            .replace(/[\\u0300-\\u036f]/g, "")
+            .replace(/[\u0300-\u036f]/g, "")
             .replace(/[^a-z0-9]+/g, " ")
             .trim()
-            .replace(/\\s+/g, " ");
+            .replace(/\s+/g, " ");
     }
 
-    // Búsqueda por palabras: cada término debe aparecer en los datos o en un sinónimo.
-    // Los plurales comunes se normalizan para que "porcelanatos" encuentre "porcelanato".
     function normalizeWord(word) {
         let w = normalizeText(word);
         if (w.length > 5 && w.endsWith("es")) w = w.slice(0, -2);
@@ -208,51 +207,57 @@
         return w;
     }
 
+    // Los sinónimos se preparan una sola vez, no en cada pulsación.
     const synonymGroups = [
-        ["porcelanato", "porcelanatos", "porcelanato esmaltado"],
-        ["ceramica", "ceramicas", "ceramico", "ceramica"],
+        ["porcelanato", "porcelanatos"],
+        ["ceramica", "ceramicas", "ceramico"],
         ["exterior", "terraza", "terrazas", "patio", "jardin", "intemperie"],
         ["oscuro", "oscura", "oscuros", "oscuras", "negro", "negra", "negros", "negras", "grafito", "antracita"],
-        ["bano", "banos", "ducha", "duchas", "wc", "humedo", "humeda", "humedos", "humedas"],
+        ["bano", "banos", "ducha", "duchas", "wc", "humedo", "humeda", "humedos", "humedas", "humedad"],
         ["antideslizante", "antideslizantes", "rugoso", "rugosa", "rugosos", "rugosas"],
         ["mate", "opaco", "opaca", "sin brillo"],
         ["piso", "pisos", "suelo", "suelos", "pavimento", "pavimentos"],
         ["muro", "muros", "pared", "paredes", "revestimiento"],
         ["brillante", "brillantes", "pulido", "pulida", "pulidos", "pulidas"]
-    ];
+    ].map(group => group.map(normalizeText));
 
-    const ignoredWords = new Set([
-        "para", "por", "con", "de", "del", "la", "el", "los", "las", "un", "una",
-        "unos", "unas", "que", "busco", "quiero", "necesito", "me", "recomienda",
-        "recomendar", "color", "colores", "tipo", "ideal", "favor", "y", "en"
-    ]);
-
-    function expandTerm(term) {
-        const word = normalizeWord(term);
-        for (const group of synonymGroups) {
-            const normalizedGroup = group.map(normalizeWord);
-            if (normalizedGroup.some(item => item === word || item.startsWith(word) || word.startsWith(item))) {
-                return normalizedGroup;
-            }
-        }
-        return [word];
+    const synonymLookup = new Map();
+    for (const group of synonymGroups) {
+        for (const word of group) synonymLookup.set(normalizeWord(word), group);
     }
 
-    function applyFilters() {
-        const query = document.getElementById("searchInput").value.trim();
-        const terms = normalizeText(query).split(" ")
-            .map(normalizeWord)
-            .filter(word => word.length > 1 && !ignoredWords.has(word));
-        const groups = terms.map(expandTerm);
-        const filtered = allProducts.filter(product => {
-            if (!groups.length) return true;
+    // Se indexan todos los campos del producto una sola vez para que la búsqueda sea rápida.
+    const searchIndex = new WeakMap();
+
+    function indexProducts() {
+        for (const product of allProducts) {
             const searchableText = normalizeText(
                 Object.entries(product)
                     .filter(([key]) => !["Imagen_URL", "Producto_URL"].includes(key))
                     .map(([key, value]) => key.replace(/_/g, " ") + " " + String(value ?? ""))
                     .join(" ")
             );
-            // Para cada palabra consultada basta con que coincida el término o un sinónimo.
+            searchIndex.set(product, searchableText);
+        }
+    }
+
+    function expandTerm(term) {
+        const word = normalizeWord(term);
+        return synonymLookup.get(word) || [word];
+    }
+
+    function applyFilters() {
+        const query = normalizeText(document.getElementById("searchInput").value);
+        const terms = query.split(/\s+/).filter(Boolean);
+        if (!terms.length) {
+            renderGrid(allProducts);
+            return;
+        }
+
+        const groups = terms.map(expandTerm);
+        const filtered = allProducts.filter(product => {
+            const searchableText = searchIndex.get(product) || "";
+            // Todas las palabras escritas deben aparecer en algún campo del mismo producto.
             return groups.every(group => group.some(term => searchableText.includes(term)));
         });
         renderGrid(filtered);
